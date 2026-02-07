@@ -2,6 +2,8 @@ export type AgentLevel = 'executive' | 'director' | 'specialist';
 export type AgentStatus = 'idle' | 'working' | 'paused' | 'error';
 export type WorkflowStatus = 'draft' | 'active' | 'paused' | 'completed' | 'failed';
 export type TaskStatus = 'pending' | 'in_progress' | 'completed' | 'failed' | 'waiting_approval';
+export type ModelPreference = 'gpt-4' | 'gpt-4-turbo' | 'gpt-3.5-turbo' | 'claude-3-opus' | 'claude-3-sonnet' | 'claude-3-haiku';
+export type MemoryScope = 'session' | 'conversation' | 'persistent';
 
 export interface Department {
   id: string;
@@ -10,6 +12,38 @@ export interface Department {
   icon: string;
   color: string;
   agentCount: number;
+}
+
+export interface AgentConfig {
+  id: string;
+  role: string;
+  systemPrompt: string;
+  allowedTools: string[];
+  modelPreference: ModelPreference;
+  memoryScope: MemoryScope;
+  temperature?: number;
+  maxTokens?: number;
+  capabilities?: string[];
+  metadata?: Record<string, unknown>;
+}
+
+export interface AgentExecutionContext {
+  sessionId?: string;
+  userId?: string;
+  timestamp: Date;
+  metadata?: Record<string, unknown>;
+}
+
+export interface AgentExecutionResult {
+  output: string;
+  agentId: string;
+  context: AgentExecutionContext;
+  error?: string;
+  usage?: {
+    promptTokens: number;
+    completionTokens: number;
+    totalTokens: number;
+  };
 }
 
 export interface Agent {
