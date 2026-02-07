@@ -5,6 +5,9 @@ export type TaskStatus = 'pending' | 'in_progress' | 'completed' | 'failed' | 'w
 export type ModelPreference = 'gpt-4' | 'gpt-4-turbo' | 'gpt-3.5-turbo' | 'claude-3-opus' | 'claude-3-sonnet' | 'claude-3-haiku';
 export type MemoryScope = 'session' | 'conversation' | 'persistent';
 
+// Memory System Types
+export * from './memory';
+
 export interface Department {
   id: string;
   name: string;

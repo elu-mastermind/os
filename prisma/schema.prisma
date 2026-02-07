@@ -120,12 +120,15 @@ model AgentMemory {
   // Relations
   agentId   String
   agent     Agent @relation(fields: [agentId], references: [id], onDelete: Cascade)
-  
-  // Cross-agent memory (for shared/org scope)
+
+  // Cross-scope memory (for workflow/org/shared)
+  workflowId String?
   organizationId String?
 
   // Index for efficient lookups
   @@index([agentId, type, scope])
+  @@index([workflowId, type, scope])
+  @@index([organizationId, type, scope])
   @@index([key])
   @@map("agent_memories")
 }

@@ -90,9 +90,111 @@ async function main() {
         value: 'Working on authentication module refactor',
         expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 days
       },
+      {
+        agentId: specialistAgent.id,
+        type: MemoryType.episodic,
+        scope: MemoryScope.agent,
+        key: 'recent_error_api_timeout',
+        value: 'API timeout on user endpoint. Resolution: Increased timeout to 30s and added retry logic.',
+        expiresAt: new Date(Date.now() + 2 * 24 * 60 * 60 * 1000), // 2 days
+      },
+      {
+        agentId: specialistAgent.id,
+        type: MemoryType.semantic,
+        scope: MemoryScope.agent,
+        key: 'code_style_preferences',
+        value: 'Use functional programming patterns, prefer immutability, use TypeScript strict mode',
+      },
     ],
   });
   console.log('Created agent memories');
+
+  // Create workflow memory
+  await prisma.agentMemory.createMany({
+    data: [
+      {
+        agentId: specialistAgent.id,
+        type: MemoryType.short_term,
+        scope: MemoryScope.workflow,
+        key: 'workflow_context',
+        value: JSON.stringify({
+          currentPhase: 'implementation',
+          totalPhases: 4,
+          completedPhases: ['design', 'planning'],
+          deadline: '2024-03-15'
+        }),
+        expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 days
+      },
+      {
+        agentId: specialistAgent.id,
+        type: MemoryType.episodic,
+        scope: MemoryScope.workflow,
+        key: 'workflow_error_001',
+        value: 'Design review failed: Missing accessibility compliance. Fixed by adding ARIA labels.',
+        expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000), // 24 hours
+      },
+    ],
+  });
+  console.log('Created workflow memories');
+
+  // Create organization-level memory (brand, policies, standards)
+  await prisma.agentMemory.createMany({
+    data: [
+      {
+        agentId: specialistAgent.id,
+        type: MemoryType.semantic,
+        scope: MemoryScope.organization,
+        organizationId: org.id,
+        key: 'brand_voice',
+        value: 'Professional, innovative, concise. Use clear language and avoid jargon when possible.',
+      },
+      {
+        agentId: specialistAgent.id,
+        type: MemoryType.semantic,
+        scope: MemoryScope.organization,
+        organizationId: org.id,
+        key: 'code_standards',
+        value: 'Follow TypeScript best practices, use strict mode, write unit tests for all functions, maintain 80%+ code coverage.',
+      },
+      {
+        agentId: specialistAgent.id,
+        type: MemoryType.semantic,
+        scope: MemoryScope.organization,
+        organizationId: org.id,
+        key: 'communication_style',
+        value: 'Be direct and actionable in responses. Provide concrete examples when explaining concepts.',
+      },
+    ],
+  });
+  console.log('Created organization memories');
+
+  // Create global memory (best practices, templates)
+  await prisma.agentMemory.createMany({
+    data: [
+      {
+        agentId: specialistAgent.id,
+        type: MemoryType.semantic,
+        scope: MemoryScope.global,
+        key: 'best_practices_error_handling',
+        value: 'Always validate inputs, handle errors gracefully, provide meaningful error messages, log errors for debugging.',
+      },
+      {
+        agentId: specialistAgent.id,
+        type: MemoryType.semantic,
+        scope: MemoryScope.global,
+        key: 'best_practices_security',
+        value: 'Never expose sensitive information in logs, use environment variables for secrets, implement rate limiting, validate all inputs.',
+      },
+      {
+        agentId: specialistAgent.id,
+        type: MemoryType.semantic,
+        scope: MemoryScope.global,
+        key: 'best_practices_code_quality',
+        value: 'Write self-documenting code, follow DRY principle, keep functions small and focused, use descriptive variable names.',
+      },
+    ],
+  });
+  console.log('Created global memories');
 
   // Create workflow
   const workflow = await prisma.workflow.create({
