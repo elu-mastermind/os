@@ -1,0 +1,439 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ==================== CORE ENTITIES ====================
+
+model Organization {
+  id        String   @id @default(uuid())
+  name      String
+  plan      PlanType @default(free)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Settings stored as JSON for flexibility
+  settings Json @default("{\"maxAgents\": 5, \"maxWorkflows\": 10, \"allowCustomAgents\": false, \"apiAccess\": false}")
+
+  // Relations
+  users    User[]
+  agents   Agent[]
+  workflows Workflow[]
+  toolCredentials ToolCredential[]
+
+  @@map("organizations")
+}
+
+model User {
+  id       String @id @default(uuid())
+  email    String @unique
+  name     String
+  password String // Hashed
+  role     UserRole @default(viewer)
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  
+  tasksAssigned  Task[] @relation("AssignedTasks")
+  tasksApproved  Task[] @relation("ApprovedTasks")
+  outputs        Output[]
+
+  @@map("users")
+}
+
+// ==================== AGENT ENTITIES ====================
+
+model Agent {
+  id          String @id @default(uuid())
+  name        String
+  role        String
+  description String?
+  
+  // Agent hierarchy level
+  level       AgentLevel @default(specialist)
+  
+  // Operational status
+  status      AgentStatus @default(idle)
+  
+  // Configuration
+  avatar      String?
+  skills      String[] @default([])
+  tools       String[] @default([])
+  
+  // KPIs stored as JSON for extensibility
+  kpis        Json @default("{\"tasksCompleted\": 0, \"successRate\": 0, \"avgResponseTime\": 0}")
+  
+  // Soft delete and activation
+  isActive    Boolean @default(true)
+  deletedAt   DateTime?
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  
+  // Memory with scoping
+  memories       AgentMemory[]
+  
+  // Workflow participation
+  workflowSteps  WorkflowStep[]
+  
+  // Task execution
+  tasks          Task[]
+  
+  // Outputs generated
+  outputs        Output[]
+
+  @@map("agents")
+}
+
+model AgentMemory {
+  id        String @id @default(uuid())
+  
+  // Memory classification
+  type      MemoryType
+  scope     MemoryScope @default(agent)
+  
+  // Content
+  key       String
+  value     String
+  
+  // Optional metadata for context
+  metadata  Json?
+  
+  // TTL for short-term memory
+  expiresAt DateTime?
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  agentId   String
+  agent     Agent @relation(fields: [agentId], references: [id], onDelete: Cascade)
+  
+  // Cross-agent memory (for shared/org scope)
+  organizationId String?
+
+  // Index for efficient lookups
+  @@index([agentId, type, scope])
+  @@index([key])
+  @@map("agent_memories")
+}
+
+// ==================== WORKFLOW ENTITIES ====================
+
+model Workflow {
+  id          String @id @default(uuid())
+  name        String
+  description String?
+  
+  // Status lifecycle: draft -> active -> paused/completed/failed
+  status      WorkflowStatus @default(draft)
+  
+  // Template flag for reusable workflows
+  isTemplate  Boolean @default(false)
+  
+  // Versioning
+  version     Int @default(1)
+  parentId    String? // For workflow versioning/forking
+  
+  // Execution metrics
+  lastRunAt   DateTime?
+  runCount    Int @default(0)
+  successRate Float @default(0)
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  
+  // Steps in this workflow
+  steps     WorkflowStep[]
+  
+  // Task executions
+  tasks     Task[]
+  
+  // Edge connections between steps (stored as JSON for flexibility)
+  edges     Json? // Array of {source, target, condition?}
+
+  @@map("workflows")
+}
+
+model WorkflowStep {
+  id   String @id @default(uuid())
+  
+  // Step configuration
+  name        String
+  description String?
+  type        StepType @default(task)
+  
+  // Visual positioning for UI
+  positionX   Float @default(0)
+  positionY   Float @default(0)
+  
+  // Step-specific configuration
+  config      Json? // {inputs?, outputs?, conditions?, timeout?, retryPolicy?}
+  
+  // Execution order (for sequential workflows)
+  orderIndex  Int @default(0)
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  workflowId  String
+  workflow    Workflow @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+  
+  // Assigned agent (optional - can be dynamic)
+  agentId     String?
+  agent       Agent? @relation(fields: [agentId], references: [id], onDelete: SetNull)
+  
+  // Tasks created from this step
+  tasks       Task[]
+
+  @@index([workflowId, orderIndex])
+  @@map("workflow_steps")
+}
+
+// ==================== TASK EXECUTION ====================
+
+model Task {
+  id          String @id @default(uuid())
+  
+  // Task identification
+  name        String
+  description String?
+  
+  // Execution status
+  status      TaskStatus @default(pending)
+  
+  // I/O
+  input       String?
+  output      String?
+  
+  // Error handling
+  error       String?
+  errorCode   String?
+  
+  // Timing
+  startedAt   DateTime?
+  completedAt DateTime?
+  dueDate     DateTime?
+  
+  // Approval workflow
+  requiresApproval Boolean @default(false)
+  approved         Boolean?
+  approvedAt       DateTime?
+  approvalNotes    String?
+  
+  // Retry logic
+  retryCount  Int @default(0)
+  maxRetries  Int @default(3)
+  
+  // Cost tracking (token usage, etc)
+  cost        Float?
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  workflowId  String
+  workflow    Workflow @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+  
+  workflowStepId String
+  workflowStep   WorkflowStep @relation(fields: [workflowStepId], references: [id], onDelete: Cascade)
+  
+  agentId     String
+  agent       Agent @relation(fields: [agentId], references: [id], onDelete: Cascade)
+  
+  // Assignment
+  assignedToId String?
+  assignedTo   User? @relation("AssignedTasks", fields: [assignedToId], references: [id], onDelete: SetNull)
+  
+  // Approval
+  approvedById String?
+  approvedBy   User? @relation("ApprovedTasks", fields: [approvedById], references: [id], onDelete: SetNull)
+  
+  // Generated outputs
+  outputs     Output[]
+
+  @@index([workflowId, status])
+  @@index([agentId, status])
+  @@index([assignedToId, status])
+  @@map("tasks")
+}
+
+// ==================== OUTPUTS ====================
+
+model Output {
+  id          String @id @default(uuid())
+  
+  // Content
+  type        OutputType
+  format      OutputFormat @default(text)
+  content     String
+  
+  // Metadata for filtering/searching
+  title       String?
+  tags        String[] @default([])
+  
+  // Storage reference for large outputs
+  storageUrl  String?
+  
+  // Size in bytes
+  sizeBytes   Int?
+  
+  createdAt   DateTime @default(now())
+
+  // Relations
+  taskId      String?
+  task        Task? @relation(fields: [taskId], references: [id], onDelete: SetNull)
+  
+  agentId     String
+  agent       Agent @relation(fields: [agentId], references: [id], onDelete: Cascade)
+  
+  userId      String?
+  user        User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([agentId, type])
+  @@index([taskId])
+  @@map("outputs")
+}
+
+// ==================== TOOL CREDENTIALS ====================
+
+model ToolCredential {
+  id          String @id @default(uuid())
+  
+  // Identification
+  name        String
+  toolType    String // e.g., "openai", "slack", "github"
+  
+  // Encrypted credential storage
+  // Store as JSON: {apiKey?: string, token?: string, secret?: string}
+  credentials Json
+  
+  // Environment indicator
+  environment String @default("production") // production, staging, development
+  
+  // Access control
+  allowedAgents String[] @default([]) // Empty = all agents
+  
+  // Usage tracking
+  lastUsedAt  DateTime?
+  useCount    Int @default(0)
+  
+  // Rotation tracking
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  expiresAt   DateTime?
+
+  // Relations
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, name, environment])
+  @@map("tool_credentials")
+}
+
+// ==================== ENUMS ====================
+
+enum PlanType {
+  free
+  pro
+  enterprise
+}
+
+enum UserRole {
+  admin
+  manager
+  viewer
+}
+
+enum AgentLevel {
+  executive
+  director
+  specialist
+}
+
+enum AgentStatus {
+  idle
+  working
+  paused
+  error
+}
+
+enum MemoryType {
+  short_term
+  long_term
+  episodic
+  semantic
+}
+
+enum MemoryScope {
+  agent      // Agent-specific memory
+  workflow   // Shared within a workflow
+  organization // Shared across organization
+  global     // Shared across all (templates, common knowledge)
+}
+
+enum WorkflowStatus {
+  draft
+  active
+  paused
+  completed
+  failed
+}
+
+enum StepType {
+  task       // Standard agent task
+  approval   // Human approval required
+  condition  // Conditional branching
+  parallel   // Parallel execution
+  loop       // Loop/iteration
+  start      // Entry point
+  end        // Exit point
+}
+
+enum TaskStatus {
+  pending
+  in_progress
+  completed
+  failed
+  waiting_approval
+  cancelled
+  retrying
+}
+
+enum OutputType {
+  text
+  code
+  file
+  image
+  audio
+  video
+  json
+  markdown
+  log
+}
+
+enum OutputFormat {
+  text
+  html
+  markdown
+  json
+  xml
+  binary
+}
