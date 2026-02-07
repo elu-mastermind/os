@@ -1,9 +1,8 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { Workflow, WorkflowNode, WorkflowEdge } from '@/types';
 import { agents } from '@/data/mockData';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Avatar } from '@/components/ui/avatar';
@@ -22,13 +21,16 @@ export function WorkflowBuilder({ workflow, onSave, onClose }: WorkflowBuilderPr
   const [selectedNode, setSelectedNode] = useState<string | null>(null);
   const [name, setName] = useState(workflow?.name || 'New Workflow');
   const [description, setDescription] = useState(workflow?.description || '');
+  const nodeIdCounter = useRef(0);
+  const edgeIdCounter = useRef(0);
 
   const addNode = (agentId: string) => {
     const agent = agents.find((a) => a.id === agentId);
     if (!agent) return;
 
+    nodeIdCounter.current += 1;
     const newNode: WorkflowNode = {
-      id: `node-${Date.now()}`,
+      id: `node-${nodeIdCounter.current}`,
       agentId: agent.id,
       agentName: agent.name,
       type: 'task',
@@ -40,8 +42,9 @@ export function WorkflowBuilder({ workflow, onSave, onClose }: WorkflowBuilderPr
 
     if (nodes.length > 0) {
       const lastNode = nodes[nodes.length - 1];
+      edgeIdCounter.current += 1;
       const newEdge: WorkflowEdge = {
-        id: `edge-${Date.now()}`,
+        id: `edge-${edgeIdCounter.current}`,
         source: lastNode.id,
         target: newNode.id,
       };
