@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Avatar } from '@/components/ui/avatar';
 import { getInitials } from '@/lib/utils';
-import { Plus, ArrowRight, Save, X } from 'lucide-react';
+import { Plus, ArrowRight, Save, X, GitBranch } from 'lucide-react';
 
 interface WorkflowBuilderProps {
   workflow?: Workflow;
